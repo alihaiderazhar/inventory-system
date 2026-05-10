@@ -103,7 +103,7 @@ elif page == "📋 Products":
     min_p, max_p = st.slider("Price Range (PKR)", 0, 100000, (0, 100000), step=500)
 
     df = run_query("""
-        SELECT p.ProductName, c.CategoryName, s.SupplierName,
+        SELECT p.ProductID, p.ProductName, c.CategoryName, s.SupplierName,
                p.UnitPrice, p.ReorderLevel, p.LeadTimeDays
         FROM Product p
         JOIN Category c ON p.CategoryID=c.CategoryID
@@ -113,6 +113,61 @@ elif page == "📋 Products":
     """, params=(f"%{search}%", min_p, max_p))
     st.dataframe(df, use_container_width=True)
     st.caption(f"{len(df)} products found")
+
+    st.markdown("---")
+    t1, t2 = st.tabs(["✏️ Edit Product", "🗑️ Delete Product"])
+
+    with t1:
+        st.subheader("Edit Product")
+        all_products = run_query("SELECT ProductID, ProductName FROM Product ORDER BY ProductName")
+        prod_map = dict(zip(all_products.ProductName, all_products.ProductID))
+        sel = st.selectbox("Select Product", list(prod_map.keys()), key="edit_sel")
+
+        if sel:
+            pid = prod_map[sel]
+            current = run_query("SELECT * FROM Product WHERE ProductID=%s", params=(pid,))
+            cats = run_query("SELECT CategoryID, CategoryName FROM Category")
+            sups = run_query("SELECT SupplierID, SupplierName FROM Supplier")
+            cat_map = dict(zip(cats.CategoryName, cats.CategoryID))
+            sup_map = dict(zip(sups.SupplierName, sups.SupplierID))
+            cat_names = list(cat_map.keys())
+            sup_names = list(sup_map.keys())
+
+            current_cat = cats[cats.CategoryID == current.iloc[0]['CategoryID']]['CategoryName'].values[0]
+            current_sup = sups[sups.SupplierID == current.iloc[0]['SupplierID']]['SupplierName'].values[0]
+
+            new_name = st.text_input("Product Name", value=current.iloc[0]['ProductName'])
+            new_cat  = st.selectbox("Category", cat_names, index=cat_names.index(current_cat))
+            new_sup  = st.selectbox("Supplier",  sup_names, index=sup_names.index(current_sup))
+            new_price = st.number_input("Price (PKR)", value=float(current.iloc[0]['UnitPrice']), min_value=1.0, step=50.0)
+            new_rl   = st.number_input("Reorder Level", value=int(current.iloc[0]['ReorderLevel']), min_value=1)
+            new_lt   = st.number_input("Lead Time (days)", value=int(current.iloc[0]['LeadTimeDays']), min_value=1)
+
+            if st.button("Update Product", type="primary"):
+                run_write("""
+                    UPDATE Product SET
+                    ProductName=%s, CategoryID=%s, SupplierID=%s,
+                    UnitPrice=%s, ReorderLevel=%s, LeadTimeDays=%s
+                    WHERE ProductID=%s
+                """, params=(new_name, cat_map[new_cat], sup_map[new_sup], new_price, new_rl, new_lt, pid))
+                st.success(f"'{new_name}' updated!")
+                st.rerun()
+
+    with t2:
+        st.subheader("Delete Product")
+        all_products2 = run_query("SELECT ProductID, ProductName FROM Product ORDER BY ProductName")
+        prod_map2 = dict(zip(all_products2.ProductName, all_products2.ProductID))
+        sel2 = st.selectbox("Select Product", list(prod_map2.keys()), key="del_sel")
+
+        if sel2:
+            st.warning(f"⚠️ '{sel2}' will be deleted!")
+            if st.button("Delete Product", type="primary"):
+                pid2 = prod_map2[sel2]
+                run_write("DELETE FROM OrderDetail WHERE ProductID=%s", params=(pid2,))
+                run_write("DELETE FROM InventoryStock WHERE ProductID=%s", params=(pid2,))
+                run_write("DELETE FROM Product WHERE ProductID=%s", params=(pid2,))
+                st.success(f"'{sel2}' deleted!")
+                st.rerun()
 
 # ── STOCK MANAGEMENT ──────────────────────────────────────
 elif page == "📦 Stock Management":
