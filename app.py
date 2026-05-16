@@ -54,7 +54,6 @@ page = st.sidebar.radio("Navigate", [
 # ── DASHBOARD ──────────────────────────────────────────────
 if page == "🏠 Dashboard":
     st.title("📦 Demand Forecasting & Inventory Control")
-    st.markdown("**FAST-NUCES | Intro to DB Lab Project**")
     st.markdown("---")
 
     col1, col2, col3, col4 = st.columns(4)
